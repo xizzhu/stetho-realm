@@ -32,6 +32,7 @@ ext {
     versionCode = 30000
     versionName = '3.0.0'
 
+    supportLibraryVersion = '25.3.1'
     realmVersion = '3.3.0'
     stethoVersion = '1.5.0'
 }

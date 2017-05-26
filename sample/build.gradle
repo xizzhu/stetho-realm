@@ -42,5 +42,7 @@ android {
 
 dependencies {
     implementation project(':stetho-realm')
+    implementation "com.android.support:support-annotations:$rootProject.ext.supportLibraryVersion"
     implementation "com.facebook.stetho:stetho:$rootProject.ext.stethoVersion"
+    implementation "com.facebook.stetho:stetho-okhttp3:$rootProject.ext.stethoVersion"
 }

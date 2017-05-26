@@ -16,7 +16,12 @@
 
 package com.github.xizzhu.stetho.realm.sample;
 
-import android.app.Activity;
+import io.realm.RealmObject;
+import io.realm.annotations.PrimaryKey;
 
-public final class MainActivity extends Activity {
+public class Book extends RealmObject {
+    @PrimaryKey
+    public String name;
+
+    public Author author;
 }

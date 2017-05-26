@@ -32,6 +32,7 @@ android {
 }
 
 dependencies {
+    compileOnly "com.android.support:support-annotations:$rootProject.ext.supportLibraryVersion"
     compileOnly "io.realm:realm-android-library:$rootProject.ext.realmVersion"
     compileOnly "com.facebook.stetho:stetho:$rootProject.ext.stethoVersion"
 }

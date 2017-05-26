@@ -18,9 +18,10 @@ package com.github.xizzhu.stetho.realm.sample;
 
 import android.app.Application;
 import com.facebook.stetho.Stetho;
+import com.github.xizzhu.stetho.realm.StethoRealmInspectorModulesProvider;
 import io.realm.Realm;
 
-public class App extends Application {
+public final class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
@@ -28,7 +29,28 @@ public class App extends Application {
         Realm.init(this);
         Stetho.initialize(Stetho.newInitializerBuilder(this)
             .enableDumpapp(Stetho.defaultDumperPluginsProvider(this))
-            .enableWebKitInspector(Stetho.defaultInspectorModulesProvider(this))
+            .enableWebKitInspector(new StethoRealmInspectorModulesProvider.Builder(this).build())
             .build());
+
+        populateRealm();
+    }
+
+    private void populateRealm() {
+        final Realm realm = Realm.getDefaultInstance();
+
+        final Author moses = new Author();
+        moses.name = "Moses";
+        final Book genesis = new Book();
+        genesis.name = "Genesis";
+        genesis.author = moses;
+        final Book exodus = new Book();
+        exodus.name = "Exodus";
+        exodus.author = moses;
+        realm.beginTransaction();
+        realm.copyToRealmOrUpdate(genesis);
+        realm.copyToRealmOrUpdate(exodus);
+        realm.commitTransaction();
+
+        realm.close();
     }
 }
