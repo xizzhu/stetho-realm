@@ -27,7 +27,9 @@ import com.facebook.stetho.json.annotation.JsonProperty;
 import io.realm.DynamicRealm;
 import io.realm.DynamicRealmObject;
 import io.realm.RealmConfiguration;
+import io.realm.RealmList;
 import io.realm.RealmObjectSchema;
+import io.realm.RealmSchema;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -107,60 +109,12 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
         }
         final String tableName = selectMatcher.group(1);
         final DynamicRealm realm = getRealm(request.databaseId);
-        final List<String> columnNames =
-            new ArrayList<>(realm.getSchema().get(tableName).getFieldNames());
+        final RealmSchema schema = realm.getSchema();
+        final List<String> columnNames = new ArrayList<>(schema.get(tableName).getFieldNames());
         final List<String> values = new ArrayList<>();
-        for (DynamicRealmObject realmObject : realm.where(tableName).findAll()) {
+        for (DynamicRealmObject object : realm.where(tableName).findAll()) {
             for (String columnName : columnNames) {
-                if (realmObject.isNull(columnName)) {
-                    values.add("<null>");
-                    continue;
-                }
-                switch (realmObject.getFieldType(columnName)) {
-                    case BINARY:
-                        values.add(Arrays.toString(realmObject.getBlob(columnName)));
-                        break;
-                    case BOOLEAN:
-                        values.add(Boolean.toString(realmObject.getBoolean(columnName)));
-                        break;
-                    case DATE:
-                        values.add(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ",
-                            Locale.ENGLISH).format(realmObject.getDate(columnName)));
-                        break;
-                    case DOUBLE:
-                        values.add(Double.toString(realmObject.getDouble(columnName)));
-                        break;
-                    case FLOAT:
-                        values.add(Float.toString(realmObject.getFloat(columnName)));
-                        break;
-                    case INTEGER:
-                        values.add(Long.toString(realmObject.getLong(columnName)));
-                        break;
-                    case LINKING_OBJECTS:
-                        values.add("<linking objects>");
-                        break;
-                    case LIST:
-                        values.add(realmObject.getList(columnName).toString());
-                        break;
-                    case OBJECT:
-                        values.add(realmObject.getObject(columnName).toString());
-                        break;
-                    case STRING:
-                        values.add(realmObject.getString(columnName));
-                        break;
-                    case UNSUPPORTED_DATE:
-                        values.add("<unsupported date>");
-                        break;
-                    case UNSUPPORTED_MIXED:
-                        values.add("<unsupported mixed>");
-                        break;
-                    case UNSUPPORTED_TABLE:
-                        values.add("<unsupported table>");
-                        break;
-                    default:
-                        values.add("<unsupported>");
-                        break;
-                }
+                values.add(formatColumn(object, columnName, schema));
             }
         }
 
@@ -168,6 +122,68 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
         response.columnNames = columnNames;
         response.values = values;
         return response;
+    }
+
+    private static String formatColumn(DynamicRealmObject object, String columnName,
+        RealmSchema schema) {
+        if (object.isNull(columnName)) {
+            return "<null>";
+        }
+        switch (object.getFieldType(columnName)) {
+            case BINARY:
+                return Arrays.toString(object.getBlob(columnName));
+            case BOOLEAN:
+                return Boolean.toString(object.getBoolean(columnName));
+            case DATE:
+                return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.ENGLISH).format(
+                    object.getDate(columnName));
+            case DOUBLE:
+                return Double.toString(object.getDouble(columnName));
+            case FLOAT:
+                return Float.toString(object.getFloat(columnName));
+            case INTEGER:
+                return Long.toString(object.getLong(columnName));
+            case LINKING_OBJECTS:
+                return "<linking objects>";
+            case LIST:
+                return formatList(object.getList(columnName), schema);
+            case OBJECT:
+                return formatObject(object.getObject(columnName), schema);
+            case STRING:
+                return object.getString(columnName);
+            case UNSUPPORTED_DATE:
+                return "<unsupported date>";
+            case UNSUPPORTED_MIXED:
+                return "<unsupported mixed>";
+            case UNSUPPORTED_TABLE:
+                return "<unsupported table>";
+            default:
+                return "<unsupported>";
+        }
+    }
+
+    private static String formatList(RealmList<DynamicRealmObject> list, RealmSchema schema) {
+        final StringBuilder builder = new StringBuilder();
+        for (DynamicRealmObject object : list) {
+            if (builder.length() > 0) {
+                builder.append(", ");
+            }
+            builder.append(formatObject(object, schema));
+        }
+        return builder.toString();
+    }
+
+    private static String formatObject(DynamicRealmObject object, RealmSchema schema) {
+        final StringBuilder builder = new StringBuilder().append(object.getType());
+        final RealmObjectSchema objectSchema = schema.get(object.getType());
+        if (objectSchema.hasPrimaryKey()) {
+            builder.append(" <")
+                .append(objectSchema.getPrimaryKey())
+                .append(':')
+                .append(formatColumn(object, objectSchema.getPrimaryKey(), schema))
+                .append('>');
+        }
+        return builder.toString();
     }
 
     @Override
