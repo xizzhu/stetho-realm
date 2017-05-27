@@ -38,6 +38,7 @@ public final class App extends Application {
 
         populateRealm();
         populateRealm2();
+        populateRealmIgnored();
     }
 
     private void populateRealm() {
@@ -83,6 +84,24 @@ public final class App extends Application {
 
         realm.beginTransaction();
         realm.copyToRealmOrUpdate(verse);
+        realm.commitTransaction();
+
+        realm.close();
+    }
+
+    private void populateRealmIgnored() {
+        final Realm realm =
+            Realm.getInstance(new RealmConfiguration.Builder().name("realm.ignored").build());
+
+        final Author moses = new Author();
+        moses.name = "Moses";
+        final Book genesis = new Book();
+        genesis.index = 0;
+        genesis.name = "Genesis";
+        genesis.author = moses;
+
+        realm.beginTransaction();
+        realm.copyToRealmOrUpdate(genesis);
         realm.commitTransaction();
 
         realm.close();
