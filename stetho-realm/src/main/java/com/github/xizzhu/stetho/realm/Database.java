@@ -156,6 +156,9 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
                     case UNSUPPORTED_TABLE:
                         values.add("<Unsupported Table>");
                         break;
+                    default:
+                        values.add("<Unsupported>");
+                        break;
                 }
             }
         }
