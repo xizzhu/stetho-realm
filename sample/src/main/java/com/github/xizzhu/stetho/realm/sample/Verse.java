@@ -18,12 +18,26 @@ package com.github.xizzhu.stetho.realm.sample;
 
 import io.realm.RealmObject;
 import io.realm.annotations.PrimaryKey;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class Book extends RealmObject {
+public class Verse extends RealmObject {
     @PrimaryKey
-    public int index;
+    public int id;
 
-    public String name;
+    public Book book;
+    public int chapter;
+    public int verse;
+    public String text;
 
-    public Author author;
+    private static final AtomicInteger ID = new AtomicInteger(0);
+
+    public static Verse create(Book book, int chapter, int verse, String text) {
+        final Verse v = new Verse();
+        v.id = ID.getAndIncrement();
+        v.book = book;
+        v.chapter = chapter;
+        v.verse = verse;
+        v.text = text;
+        return v;
+    }
 }

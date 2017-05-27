@@ -20,6 +20,8 @@ import android.app.Application;
 import com.facebook.stetho.Stetho;
 import com.github.xizzhu.stetho.realm.StethoRealmInspectorModulesProvider;
 import io.realm.Realm;
+import io.realm.RealmConfiguration;
+import java.io.File;
 
 public final class App extends Application {
     @Override
@@ -29,10 +31,13 @@ public final class App extends Application {
         Realm.init(this);
         Stetho.initialize(Stetho.newInitializerBuilder(this)
             .enableDumpapp(Stetho.defaultDumperPluginsProvider(this))
-            .enableWebKitInspector(new StethoRealmInspectorModulesProvider.Builder(this).build())
+            .enableWebKitInspector(
+                new StethoRealmInspectorModulesProvider.Builder(this).dirs(getFilesDir(),
+                    new File(getFilesDir(), "custom")).build())
             .build());
 
         populateRealm();
+        populateRealm2();
     }
 
     private void populateRealm() {
@@ -41,14 +46,38 @@ public final class App extends Application {
         final Author moses = new Author();
         moses.name = "Moses";
         final Book genesis = new Book();
+        genesis.index = 0;
         genesis.name = "Genesis";
         genesis.author = moses;
         final Book exodus = new Book();
         exodus.name = "Exodus";
         exodus.author = moses;
+
         realm.beginTransaction();
         realm.copyToRealmOrUpdate(genesis);
         realm.copyToRealmOrUpdate(exodus);
+        realm.commitTransaction();
+
+        realm.close();
+    }
+
+    private void populateRealm2() {
+        final Realm realm = Realm.getInstance(
+            new RealmConfiguration.Builder().directory(new File(getFilesDir(), "custom"))
+                .name("random.realm")
+                .build());
+
+        final Author moses = new Author();
+        moses.name = "Moses";
+        final Book genesis = new Book();
+        genesis.index = 0;
+        genesis.name = "Genesis";
+        genesis.author = moses;
+        final Verse verse =
+            Verse.create(genesis, 0, 0, "In the beginning God created the heaven and the earth.");
+
+        realm.beginTransaction();
+        realm.copyToRealmOrUpdate(verse);
         realm.commitTransaction();
 
         realm.close();
