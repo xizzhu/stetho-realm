@@ -23,18 +23,23 @@ import com.facebook.stetho.Stetho;
 import com.facebook.stetho.inspector.protocol.ChromeDevtoolsDomain;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class StethoRealmInspectorModulesProvider implements InspectorModulesProvider {
     private final Context applicationContext;
     private final InspectorModulesProvider baseProvider;
     private final File[] dirs;
+    private final Map<String, byte[]> encryptionKeys;
 
     StethoRealmInspectorModulesProvider(Context applicationContext,
-        InspectorModulesProvider baseProvider, File[] dirs) {
+        InspectorModulesProvider baseProvider, File[] dirs, Map<String, byte[]> encryptionKeys) {
         this.applicationContext = applicationContext;
         this.baseProvider = baseProvider;
         this.dirs = dirs;
+        this.encryptionKeys = encryptionKeys;
     }
 
     @Override
@@ -48,13 +53,14 @@ public final class StethoRealmInspectorModulesProvider implements InspectorModul
             }
         }
 
-        modules.add(new Database(applicationContext.getPackageName(), dirs));
+        modules.add(new Database(applicationContext.getPackageName(), dirs, encryptionKeys));
 
         return modules;
     }
 
     public static final class Builder {
         private final Context applicationContext;
+        private final Map<String, byte[]> encryptionKeys = new HashMap<>();
 
         @Nullable
         private InspectorModulesProvider baseProvider;
@@ -76,6 +82,11 @@ public final class StethoRealmInspectorModulesProvider implements InspectorModul
             return this;
         }
 
+        public Builder encryptionKey(String fileName, byte[] encryptionKey) {
+            encryptionKeys.put(fileName, Arrays.copyOf(encryptionKey, encryptionKey.length));
+            return this;
+        }
+
         public StethoRealmInspectorModulesProvider build() {
             if (baseProvider == null) {
                 baseProvider = Stetho.defaultInspectorModulesProvider(applicationContext);
@@ -83,7 +94,8 @@ public final class StethoRealmInspectorModulesProvider implements InspectorModul
             if (dirs == null || dirs.length == 0) {
                 dirs = new File[] { applicationContext.getFilesDir() };
             }
-            return new StethoRealmInspectorModulesProvider(applicationContext, baseProvider, dirs);
+            return new StethoRealmInspectorModulesProvider(applicationContext, baseProvider, dirs,
+                encryptionKeys);
         }
     }
 }
