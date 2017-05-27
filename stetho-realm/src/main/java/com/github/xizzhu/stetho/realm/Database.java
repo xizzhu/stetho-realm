@@ -105,8 +105,13 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
         final String query = request.query.trim();
         final Matcher selectMatcher = SELECT_ALL_PATTERN.matcher(query);
         if (!selectMatcher.matches()) {
-            return null;
+            final ExecuteSQLResponse response = new ExecuteSQLResponse();
+            final Error error = new Error();
+            error.message = "NOT SUPPORTED";
+            response.sqlError = error;
+            return response;
         }
+
         final String tableName = selectMatcher.group(1);
         final DynamicRealm realm = getRealm(request.databaseId);
         final RealmSchema schema = realm.getSchema();
