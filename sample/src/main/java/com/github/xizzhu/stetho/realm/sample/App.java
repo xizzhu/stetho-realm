@@ -50,12 +50,17 @@ public final class App extends Application {
         genesis.name = "Genesis";
         genesis.author = moses;
         final Book exodus = new Book();
+        exodus.index = 1;
         exodus.name = "Exodus";
         exodus.author = moses;
+        final Book hebrews = new Book();
+        hebrews.index = 57;
+        hebrews.name = "Letter to the Hebrews";
 
         realm.beginTransaction();
         realm.copyToRealmOrUpdate(genesis);
         realm.copyToRealmOrUpdate(exodus);
+        realm.copyToRealmOrUpdate(hebrews);
         realm.commitTransaction();
 
         realm.close();

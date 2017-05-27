@@ -16,6 +16,7 @@
 
 package com.github.xizzhu.stetho.realm.sample;
 
+import android.support.annotation.Nullable;
 import io.realm.RealmObject;
 import io.realm.annotations.PrimaryKey;
 
@@ -25,5 +26,6 @@ public class Book extends RealmObject {
 
     public String name;
 
+    @Nullable
     public Author author;
 }

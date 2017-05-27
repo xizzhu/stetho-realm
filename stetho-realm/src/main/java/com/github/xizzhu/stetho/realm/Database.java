@@ -31,6 +31,7 @@ import io.realm.RealmObjectSchema;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -112,12 +113,12 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
         for (DynamicRealmObject realmObject : realm.where(tableName).findAll()) {
             for (String columnName : columnNames) {
                 if (realmObject.isNull(columnName)) {
-                    values.add("<NULL>");
+                    values.add("<null>");
                     continue;
                 }
                 switch (realmObject.getFieldType(columnName)) {
                     case BINARY:
-                        values.add("<Binary>");
+                        values.add(Arrays.toString(realmObject.getBlob(columnName)));
                         break;
                     case BOOLEAN:
                         values.add(Boolean.toString(realmObject.getBoolean(columnName)));
@@ -136,28 +137,28 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
                         values.add(Long.toString(realmObject.getLong(columnName)));
                         break;
                     case LINKING_OBJECTS:
-                        values.add("<Linking Objects>");
+                        values.add("<linking objects>");
                         break;
                     case LIST:
-                        values.add("<List>");
+                        values.add(realmObject.getList(columnName).toString());
                         break;
                     case OBJECT:
-                        values.add("<Object>");
+                        values.add(realmObject.getObject(columnName).toString());
                         break;
                     case STRING:
                         values.add(realmObject.getString(columnName));
                         break;
                     case UNSUPPORTED_DATE:
-                        values.add("<Unsupported Date>");
+                        values.add("<unsupported date>");
                         break;
                     case UNSUPPORTED_MIXED:
-                        values.add("<Unsupported Mixed>");
+                        values.add("<unsupported mixed>");
                         break;
                     case UNSUPPORTED_TABLE:
-                        values.add("<Unsupported Table>");
+                        values.add("<unsupported table>");
                         break;
                     default:
-                        values.add("<Unsupported>");
+                        values.add("<unsupported>");
                         break;
                 }
             }
