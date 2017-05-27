@@ -18,6 +18,7 @@ package com.github.xizzhu.stetho.realm;
 
 import android.content.Context;
 import android.support.annotation.Nullable;
+import android.text.TextUtils;
 import com.facebook.stetho.InspectorModulesProvider;
 import com.facebook.stetho.Stetho;
 import com.facebook.stetho.inspector.protocol.ChromeDevtoolsDomain;
@@ -27,18 +28,22 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public final class StethoRealmInspectorModulesProvider implements InspectorModulesProvider {
     private final Context applicationContext;
     private final InspectorModulesProvider baseProvider;
     private final File[] dirs;
+    private final Pattern namePattern;
     private final Map<String, byte[]> encryptionKeys;
 
     StethoRealmInspectorModulesProvider(Context applicationContext,
-        InspectorModulesProvider baseProvider, File[] dirs, Map<String, byte[]> encryptionKeys) {
+        InspectorModulesProvider baseProvider, File[] dirs, Pattern namePattern,
+        Map<String, byte[]> encryptionKeys) {
         this.applicationContext = applicationContext;
         this.baseProvider = baseProvider;
         this.dirs = dirs;
+        this.namePattern = namePattern;
         this.encryptionKeys = encryptionKeys;
     }
 
@@ -53,7 +58,8 @@ public final class StethoRealmInspectorModulesProvider implements InspectorModul
             }
         }
 
-        modules.add(new Database(applicationContext.getPackageName(), dirs, encryptionKeys));
+        modules.add(
+            new Database(applicationContext.getPackageName(), dirs, namePattern, encryptionKeys));
 
         return modules;
     }
@@ -61,12 +67,12 @@ public final class StethoRealmInspectorModulesProvider implements InspectorModul
     public static final class Builder {
         private final Context applicationContext;
         private final Map<String, byte[]> encryptionKeys = new HashMap<>();
-
         @Nullable
         private InspectorModulesProvider baseProvider;
-
         @Nullable
         private File[] dirs;
+        @Nullable
+        private String namePattern;
 
         public Builder(Context context) {
             applicationContext = context.getApplicationContext();
@@ -82,6 +88,11 @@ public final class StethoRealmInspectorModulesProvider implements InspectorModul
             return this;
         }
 
+        public Builder namePattern(@Nullable String namePattern) {
+            this.namePattern = namePattern;
+            return this;
+        }
+
         public Builder encryptionKey(String fileName, byte[] encryptionKey) {
             encryptionKeys.put(fileName, Arrays.copyOf(encryptionKey, encryptionKey.length));
             return this;
@@ -94,8 +105,10 @@ public final class StethoRealmInspectorModulesProvider implements InspectorModul
             if (dirs == null || dirs.length == 0) {
                 dirs = new File[] { applicationContext.getFilesDir() };
             }
+            final Pattern namePattern = Pattern.compile(
+                TextUtils.isEmpty(this.namePattern) ? ".+\\.realm" : this.namePattern);
             return new StethoRealmInspectorModulesProvider(applicationContext, baseProvider, dirs,
-                encryptionKeys);
+                namePattern, encryptionKeys);
         }
     }
 }

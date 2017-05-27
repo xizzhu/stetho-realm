@@ -34,6 +34,7 @@ public final class App extends Application {
         final StethoRealmInspectorModulesProvider inspectorModulesProvider =
             new StethoRealmInspectorModulesProvider.Builder(this)
                 .dirs(new File(...))
+                .namePattern(".+\\.realm")
                 .encryptionKey("encrypted.realm", new byte[] {...})
                 .build();
         Stetho.initialize(Stetho.newInitializerBuilder(this)

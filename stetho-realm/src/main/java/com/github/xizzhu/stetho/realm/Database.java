@@ -51,11 +51,14 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
     private final Map<String, DynamicRealm> realms = new HashMap<>();
     private final String packageName;
     private final File[] dirs;
+    private final Pattern namePattern;
     private final Map<String, byte[]> encryptionKeys;
 
-    Database(String packageName, File[] dirs, Map<String, byte[]> encryptionKeys) {
+    Database(String packageName, File[] dirs, Pattern namePattern,
+        Map<String, byte[]> encryptionKeys) {
         this.packageName = packageName;
         this.dirs = dirs;
+        this.namePattern = namePattern;
         this.encryptionKeys = encryptionKeys;
         peerManager.setListener(this);
     }
@@ -204,7 +207,8 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
                 continue;
             }
             for (File file : dir.listFiles()) {
-                if (!file.isFile() || !file.canRead() || !file.getName().endsWith(".realm")) {
+                if (!file.isFile() || !file.canRead() || !namePattern.matcher(file.getName())
+                    .matches()) {
                     continue;
                 }
                 final DatabaseObject databaseParams = new DatabaseObject();
