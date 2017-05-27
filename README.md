@@ -1,7 +1,48 @@
 Stetho-Realm
 ============
 
+[![API](https://img.shields.io/badge/API-9%2B-green.svg?style=flat)](https://developer.android.com/about/versions/android-2.3.html)
+[![Release](https://jitpack.io/v/xizzhu/stetho-realm.svg)](https://jitpack.io/#xizzhu/stetho-realm)
+
 A [Realm](https://realm.io/) module for [Stetho](https://github.com/facebook/stetho).
+
+How to Use
+----------
+
+### Download
+* Add the following to your `build.gradle`:
+```gradle
+repositories {
+    maven { url "https://jitpack.io" }
+}
+
+dependencies {
+    compile 'com.facebook.stetho:stetho:1.5.0'
+    compile 'com.github.xizzhu:stetho-realm:-SNAPSHOT'
+}
+```
+
+### Integration
+````java
+public final class App extends Application {
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        Realm.init(this);
+
+        final StethoRealmInspectorModulesProvider inspectorModulesProvider =
+            new StethoRealmInspectorModulesProvider.Builder(this)
+                .dirs(new File(...))
+                .encryptionKey("encrypted.realm", new byte[] {...})
+                .build();
+        Stetho.initialize(Stetho.newInitializerBuilder(this)
+            .enableDumpapp(Stetho.defaultDumperPluginsProvider(this))
+            .enableWebKitInspector(inspectorModulesProvider)
+            .build());
+    }
+}
+````
 
 License
 -------
