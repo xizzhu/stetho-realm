@@ -132,6 +132,9 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
                     case FLOAT:
                         values.add(Float.toString(realmObject.getFloat(columnName)));
                         break;
+                    case INTEGER:
+                        values.add(Long.toString(realmObject.getLong(columnName)));
+                        break;
                     case LINKING_OBJECTS:
                         values.add("<Linking Objects>");
                         break;
