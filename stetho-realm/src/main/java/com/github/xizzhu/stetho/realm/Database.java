@@ -16,6 +16,7 @@
 
 package com.github.xizzhu.stetho.realm;
 
+import android.text.TextUtils;
 import com.facebook.stetho.inspector.helper.ChromePeerManager;
 import com.facebook.stetho.inspector.helper.PeerRegistrationListener;
 import com.facebook.stetho.inspector.jsonrpc.JsonRpcPeer;
@@ -104,32 +105,64 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
         return realm;
     }
 
+    private static final Pattern SELECT_PATTERN =
+        Pattern.compile("SELECT ((\\w+, ?)*\\w+) FROM \"?(\\w+)\"?", Pattern.CASE_INSENSITIVE);
     private static final Pattern SELECT_ALL_PATTERN =
-        Pattern.compile("SELECT[ \\t]+rowid,[ \\t]+\\*[ \\t]+FROM \"([^\"]+)\"");
+        Pattern.compile("SELECT (rowid, ?)?\\* FROM \"?(\\w+)\"?", Pattern.CASE_INSENSITIVE);
 
     @ChromeDevtoolsMethod
     public JsonRpcResult executeSQL(JsonRpcPeer peer, JSONObject params) {
         final ExecuteSQLRequest request =
             objectMapper.convertValue(params, ExecuteSQLRequest.class);
-        final String query = request.query.trim();
-        final Matcher selectMatcher = SELECT_ALL_PATTERN.matcher(query);
-        if (!selectMatcher.matches()) {
+        final DynamicRealm realm = getRealm(request.databaseId);
+        final RealmSchema schema = realm.getSchema();
+        String tableName = null;
+        List<String> columnNames = null;
+        final String query = request.query.replaceAll("\\s+", " ").trim();
+        final Matcher selectMatcher = SELECT_PATTERN.matcher(query);
+        if (selectMatcher.matches()) {
+            final String[] columns = selectMatcher.group(1).replaceAll("\\s+", "").split(",");
+            columnNames = new ArrayList<>();
+            columnNames.addAll(Arrays.asList(columns));
+            tableName = selectMatcher.group(3);
+        } else {
+            final Matcher selectAllMatcher = SELECT_ALL_PATTERN.matcher(query);
+            if (selectAllMatcher.matches()) {
+                tableName = selectAllMatcher.group(2);
+                columnNames = new ArrayList<>();
+                columnNames.addAll(schema.get(tableName).getFieldNames());
+            }
+        }
+        if (TextUtils.isEmpty(tableName)) {
             final ExecuteSQLResponse response = new ExecuteSQLResponse();
             final Error error = new Error();
-            error.message = "NOT SUPPORTED";
+            error.message = "Query not supported";
             response.sqlError = error;
             return response;
         }
 
-        final String tableName = selectMatcher.group(1);
-        final DynamicRealm realm = getRealm(request.databaseId);
-        final RealmSchema schema = realm.getSchema();
-        final List<String> columnNames = new ArrayList<>(schema.get(tableName).getFieldNames());
+        if (!"rowid".equals(columnNames.get(0))) {
+            columnNames.add(0, "rowid");
+        }
+
         final List<String> values = new ArrayList<>();
-        for (DynamicRealmObject object : realm.where(tableName).findAll()) {
-            for (String columnName : columnNames) {
-                values.add(formatColumn(object, columnName, schema));
+        try {
+            int rowid = 0;
+            for (DynamicRealmObject object : realm.where(tableName).findAll()) {
+                for (String columnName : columnNames) {
+                    if ("rowid".equals(columnName)) {
+                        values.add(Integer.toString(rowid++));
+                    } else {
+                        values.add(formatColumn(object, columnName, schema));
+                    }
+                }
             }
+        } catch (Exception e) {
+            final ExecuteSQLResponse response = new ExecuteSQLResponse();
+            final Error error = new Error();
+            error.message = e.getMessage();
+            response.sqlError = error;
+            return response;
         }
 
         final ExecuteSQLResponse response = new ExecuteSQLResponse();
