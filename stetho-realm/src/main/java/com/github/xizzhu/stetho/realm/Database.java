@@ -25,12 +25,10 @@ import com.facebook.stetho.inspector.protocol.ChromeDevtoolsDomain;
 import com.facebook.stetho.inspector.protocol.ChromeDevtoolsMethod;
 import com.facebook.stetho.json.ObjectMapper;
 import com.facebook.stetho.json.annotation.JsonProperty;
-import io.realm.DynamicRealm;
-import io.realm.DynamicRealmObject;
 import io.realm.RealmConfiguration;
-import io.realm.RealmList;
-import io.realm.RealmObjectSchema;
-import io.realm.RealmSchema;
+import io.realm.internal.CheckedRow;
+import io.realm.internal.SharedRealm;
+import io.realm.internal.Table;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -49,7 +47,7 @@ import org.json.JSONObject;
 final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
     private final ChromePeerManager peerManager = new ChromePeerManager();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Map<String, DynamicRealm> realms = new HashMap<>();
+    private final Map<String, SharedRealm> realms = new HashMap<>();
     private final String packageName;
     private final File[] dirs;
     private final Pattern namePattern;
@@ -76,11 +74,12 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
 
     @ChromeDevtoolsMethod
     public JsonRpcResult getDatabaseTableNames(JsonRpcPeer peer, JSONObject params) {
-        final List<String> tableNames = new ArrayList<>();
-        final DynamicRealm realm = getRealm(
+        final SharedRealm realm = getRealm(
             objectMapper.convertValue(params, GetDatabaseTableNamesRequest.class).databaseId);
-        for (RealmObjectSchema schema : realm.getSchema().getAll()) {
-            tableNames.add(schema.getClassName());
+        final int size = (int) realm.size();
+        final List<String> tableNames = new ArrayList<>(size);
+        for (int i = 0; i < size; ++i) {
+            tableNames.add(realm.getTableName(i));
         }
 
         final GetDatabaseTableNamesResponse response = new GetDatabaseTableNamesResponse();
@@ -88,8 +87,8 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
         return response;
     }
 
-    private synchronized DynamicRealm getRealm(String path) {
-        DynamicRealm realm = realms.get(path);
+    private synchronized SharedRealm getRealm(String path) {
+        SharedRealm realm = realms.get(path);
         if (realm == null) {
             final File realmFile = new File(path);
             final RealmConfiguration.Builder builder =
@@ -99,7 +98,7 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
             if (encryptionKey != null && encryptionKey.length > 0) {
                 builder.encryptionKey(encryptionKey);
             }
-            realm = DynamicRealm.getInstance(builder.build());
+            realm = SharedRealm.getInstance(builder.build());
             realms.put(path, realm);
         }
         return realm;
@@ -112,51 +111,57 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
 
     @ChromeDevtoolsMethod
     public JsonRpcResult executeSQL(JsonRpcPeer peer, JSONObject params) {
-        final ExecuteSQLRequest request =
-            objectMapper.convertValue(params, ExecuteSQLRequest.class);
-        final DynamicRealm realm = getRealm(request.databaseId);
-        final RealmSchema schema = realm.getSchema();
-        String tableName = null;
-        List<String> columnNames = null;
-        final String query = request.query.replaceAll("\\s+", " ").trim();
-        final Matcher selectMatcher = SELECT_PATTERN.matcher(query);
-        if (selectMatcher.matches()) {
-            final String[] columns = selectMatcher.group(1).replaceAll("\\s+", "").split(",");
-            columnNames = new ArrayList<>();
-            columnNames.addAll(Arrays.asList(columns));
-            tableName = selectMatcher.group(3);
-        } else {
-            final Matcher selectAllMatcher = SELECT_ALL_PATTERN.matcher(query);
-            if (selectAllMatcher.matches()) {
-                tableName = selectAllMatcher.group(2);
-                columnNames = new ArrayList<>();
-                columnNames.addAll(schema.get(tableName).getFieldNames());
-            }
-        }
-        if (TextUtils.isEmpty(tableName)) {
-            final ExecuteSQLResponse response = new ExecuteSQLResponse();
-            final Error error = new Error();
-            error.message = "Query not supported";
-            response.sqlError = error;
-            return response;
-        }
-
-        if (!"rowid".equals(columnNames.get(0))) {
-            columnNames.add(0, "rowid");
-        }
-
-        final List<String> values = new ArrayList<>();
         try {
-            int rowid = 0;
-            for (DynamicRealmObject object : realm.where(tableName).findAll()) {
-                for (String columnName : columnNames) {
-                    if ("rowid".equals(columnName)) {
-                        values.add(Integer.toString(rowid++));
-                    } else {
-                        values.add(formatColumn(object, columnName, schema));
+            final ExecuteSQLRequest request =
+                objectMapper.convertValue(params, ExecuteSQLRequest.class);
+            final SharedRealm realm = getRealm(request.databaseId);
+            String tableName = null;
+            final List<String> columnNames = new ArrayList<>();
+            final String query = request.query.replaceAll("\\s+", " ").trim();
+            final Matcher selectMatcher = SELECT_PATTERN.matcher(query);
+            if (selectMatcher.matches()) {
+                tableName = selectMatcher.group(3);
+                columnNames.addAll(
+                    Arrays.asList(selectMatcher.group(1).replaceAll("\\s+", "").split(",")));
+            } else {
+                final Matcher selectAllMatcher = SELECT_ALL_PATTERN.matcher(query);
+                if (selectAllMatcher.matches()) {
+                    tableName = selectAllMatcher.group(2);
+
+                    final Table table = realm.getTable(tableName);
+                    final long columns = table.getColumnCount();
+                    for (long i = 0L; i < columns; ++i) {
+                        columnNames.add(table.getColumnName(i));
                     }
                 }
             }
+            if (TextUtils.isEmpty(tableName)) {
+                final ExecuteSQLResponse response = new ExecuteSQLResponse();
+                final Error error = new Error();
+                error.message = "Query not supported";
+                response.sqlError = error;
+                return response;
+            }
+            columnNames.add(0, "rowid");
+
+            final Table table = realm.getTable(tableName);
+            final long columns = table.getColumnCount();
+            final long rows = table.size();
+            final List<String> values = new ArrayList<>();
+            for (long row = 0L; row < rows; ++row) {
+                // first column is "rowid"
+                values.add(Long.toString(row));
+
+                final CheckedRow checkedRow = table.getCheckedRow(row);
+                for (long column = 0L; column < columns; ++column) {
+                    values.add(formatColumn(checkedRow, column, table));
+                }
+            }
+
+            final ExecuteSQLResponse response = new ExecuteSQLResponse();
+            response.columnNames = columnNames;
+            response.values = values;
+            return response;
         } catch (Exception e) {
             final ExecuteSQLResponse response = new ExecuteSQLResponse();
             final Error error = new Error();
@@ -164,40 +169,34 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
             response.sqlError = error;
             return response;
         }
-
-        final ExecuteSQLResponse response = new ExecuteSQLResponse();
-        response.columnNames = columnNames;
-        response.values = values;
-        return response;
     }
 
-    private static String formatColumn(DynamicRealmObject object, String columnName,
-        RealmSchema schema) {
-        if (object.isNull(columnName)) {
+    private static String formatColumn(CheckedRow checkedRow, long column, Table table) {
+        if (checkedRow.isNull(column) || checkedRow.isNullLink(column)) {
             return "<null>";
         }
-        switch (object.getFieldType(columnName)) {
+        switch (checkedRow.getColumnType(column)) {
             case BINARY:
-                return Arrays.toString(object.getBlob(columnName));
+                return Arrays.toString(checkedRow.getBinaryByteArray(column));
             case BOOLEAN:
-                return Boolean.toString(object.getBoolean(columnName));
+                return Boolean.toString(checkedRow.getBoolean(column));
             case DATE:
                 return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.ENGLISH).format(
-                    object.getDate(columnName));
+                    checkedRow.getDate(column));
             case DOUBLE:
-                return Double.toString(object.getDouble(columnName));
+                return Double.toString(checkedRow.getDouble(column));
             case FLOAT:
-                return Float.toString(object.getFloat(columnName));
+                return Float.toString(checkedRow.getFloat(column));
             case INTEGER:
-                return Long.toString(object.getLong(columnName));
+                return Long.toString(checkedRow.getLong(column));
             case LINKING_OBJECTS:
                 return "<linking objects>";
             case LIST:
-                return formatList(object.getList(columnName), schema);
+                return checkedRow.getLinkList(column).toString();
             case OBJECT:
-                return formatObject(object.getObject(columnName), schema);
+                return formatObject(checkedRow, column, table);
             case STRING:
-                return object.getString(columnName);
+                return checkedRow.getString(column);
             case UNSUPPORTED_DATE:
                 return "<unsupported date>";
             case UNSUPPORTED_MIXED:
@@ -209,25 +208,17 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
         }
     }
 
-    private static String formatList(RealmList<DynamicRealmObject> list, RealmSchema schema) {
-        final StringBuilder builder = new StringBuilder();
-        for (DynamicRealmObject object : list) {
-            if (builder.length() > 0) {
-                builder.append(", ");
-            }
-            builder.append(formatObject(object, schema));
-        }
-        return builder.toString();
-    }
-
-    private static String formatObject(DynamicRealmObject object, RealmSchema schema) {
-        final StringBuilder builder = new StringBuilder().append(object.getType());
-        final RealmObjectSchema objectSchema = schema.get(object.getType());
-        if (objectSchema.hasPrimaryKey()) {
-            builder.append(" <")
-                .append(objectSchema.getPrimaryKey())
-                .append(':')
-                .append(formatColumn(object, objectSchema.getPrimaryKey(), schema))
+    private static String formatObject(CheckedRow checkedRow, long column, Table table) {
+        final Table target = table.getLinkTarget(column);
+        final StringBuilder builder = new StringBuilder().append(target.getClassName());
+        if (target.hasPrimaryKey()) {
+            final long primaryKeyColumn = target.getPrimaryKey();
+            builder.append('<')
+                .append(target.getColumnName(primaryKeyColumn))
+                .append(": ")
+                .append(
+                    formatColumn(target.getCheckedRow(checkedRow.getLink(column)), primaryKeyColumn,
+                        target))
                 .append('>');
         }
         return builder.toString();
@@ -258,7 +249,7 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
 
     @Override
     public void onPeerUnregistered(JsonRpcPeer jsonRpcPeer) {
-        for (Map.Entry<String, DynamicRealm> entry : realms.entrySet()) {
+        for (Map.Entry<String, SharedRealm> entry : realms.entrySet()) {
             entry.getValue().close();
         }
         realms.clear();
