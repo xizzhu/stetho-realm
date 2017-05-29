@@ -154,7 +154,10 @@ final class Database implements ChromeDevtoolsDomain, PeerRegistrationListener {
 
                 final CheckedRow checkedRow = table.getCheckedRow(row);
                 for (long column = 0L; column < columns; ++column) {
-                    values.add(formatColumn(checkedRow, column, table));
+                    final String columnName = table.getColumnName(column);
+                    if (columnNames.contains(columnName)) {
+                        values.add(formatColumn(checkedRow, column, table));
+                    }
                 }
             }
 
