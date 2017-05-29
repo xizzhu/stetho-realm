@@ -18,7 +18,7 @@ repositories {
 
 dependencies {
     compile 'com.facebook.stetho:stetho:1.5.0'
-    compile 'com.github.xizzhu:stetho-realm:v0.1.0'
+    compile 'com.github.xizzhu:stetho-realm:v0.1.1'
 }
 ```
 
