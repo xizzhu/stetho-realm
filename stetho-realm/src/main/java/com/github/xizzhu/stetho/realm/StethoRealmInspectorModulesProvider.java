@@ -54,7 +54,10 @@ public final class StethoRealmInspectorModulesProvider implements InspectorModul
         final Iterable<ChromeDevtoolsDomain> base = baseProvider.get();
         if (base != null) {
             for (ChromeDevtoolsDomain domain : base) {
-                modules.add(domain);
+                // TODO Make it work with SQLite.
+                if (!(domain instanceof com.facebook.stetho.inspector.protocol.module.Database)) {
+                    modules.add(domain);
+                }
             }
         }
 
