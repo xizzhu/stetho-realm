@@ -1,6 +1,9 @@
 #### Future Release
 
-#### v0.1.2 (2017-05-29)
+#### 0.1.3 (2017-05-29)
+- Fixed column selections.
+
+#### 0.1.2 (2017-05-29)
 - Used internal SharedRealm.
 
 #### v0.1.1 (2017-05-29)
